@@ -1,0 +1,229 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  role          Role
+  isActive      Boolean   @default(true)
+  tokenVersion  Int       @default(0)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  teacherProfile Teacher?
+  studentProfile Student?
+  parentProfile  Parent?
+  refreshTokens  RefreshToken[]
+
+  @@index([role])
+  @@index([deletedAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  classes         Class[]
+  subjects        Subject[]
+  teachers  Teacher[]
+  students  Student[]
+}
+
+model Teacher {
+  id           String     @id @default(cuid())
+  userId       String     @unique
+  user         User       @relation(fields: [userId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  firstName    String
+  lastName     String
+  employeeCode String     @unique
+  hireDate     DateTime
+  isActive     Boolean    @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  classesTaught   Class[]          @relation("ClassTeacher")
+  subjectsTaught  ClassSubject[]   @relation("SubjectTeacher")
+  timetables      TimetableSlot[]  @relation("TeacherTimetable")
+  @@index([departmentId])
+  @@index([deletedAt])
+}
+
+model Student {
+  id           String     @id @default(cuid())
+  userId       String     @unique
+  user         User       @relation(fields: [userId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  firstName    String
+  lastName     String
+  admissionNo  String     @unique
+  dateOfBirth  DateTime
+  parentId     String?
+  parent       Parent?    @relation(fields: [parentId], references: [id])
+  isActive     Boolean    @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  enrollments     ClassEnrollment[]
+  timetables      TimetableSlot[]  @relation("StudentTimetable")
+  @@index([departmentId])
+  @@index([parentId])
+  @@index([deletedAt])
+}
+
+model Parent {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id])
+  firstName String
+  lastName  String
+  phone     String?
+  students  Student[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model AppSetting {
+  id          String   @id @default(cuid())
+  param       String   @unique
+  valString   String?
+  valInt      Int?
+  valBool     Boolean?
+  valJson     Json?
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+
+
+
+model Class {
+  id             String    @id @default(cuid())
+  name           String                            // "Form 1A", "Grade 10B"
+  code           String    @unique                 // "F1A", "G10B"
+  academicYear   String                            // "2025", "2026"
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id])
+  classTeacherId String?
+  classTeacher   Teacher?  @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  isActive       Boolean   @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  enrollments    ClassEnrollment[]
+  subjects       ClassSubject[]
+  timetables     TimetableSlot[]
+
+  @@unique([code, academicYear])
+  @@index([departmentId])
+  @@index([classTeacherId])
+  @@index([deletedAt])
+}
+
+model Subject {
+  id           String    @id @default(cuid())
+  name         String                            // "Mathematics"
+  code         String    @unique                 // "MATH"
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  isActive     Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  classes      ClassSubject[]
+  timetables   TimetableSlot[]
+
+  @@index([departmentId])
+  @@index([deletedAt])
+}
+
+/// Many-to-many: a subject is offered by one or more classes, taught by a teacher.
+model ClassSubject {
+  id         String    @id @default(cuid())
+  classId    String
+  class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacherId  String
+  teacher    Teacher   @relation("SubjectTeacher", fields: [teacherId], references: [id])
+  createdAt  DateTime  @default(now())
+
+  @@unique([classId, subjectId, teacherId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([teacherId])
+}
+
+/// Student is enrolled in a class for a term.
+model ClassEnrollment {
+  id         String    @id @default(cuid())
+  classId    String
+  class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term       String                               // "2025-Term1"
+  enrolledAt DateTime  @default(now())
+  isActive   Boolean   @default(true)
+
+  @@unique([classId, studentId, term])
+  @@index([classId])
+  @@index([studentId])
+}
+
+/// One slot in the weekly timetable: (class, subject, teacher, day, period).
+model TimetableSlot {
+  id         String   @id @default(cuid())
+  classId    String
+  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject  @relation(fields: [subjectId], references: [id])
+  teacherId  String
+  teacher    Teacher  @relation("TeacherTimetable", fields: [teacherId], references: [id])
+  studentId  String?  // optional: student-specific slots (electives)
+  student    Student? @relation("StudentTimetable", fields: [studentId], references: [id])
+  dayOfWeek  Int      // 1=Mon … 5=Fri
+  period     Int      // 1..8
+  startTime  String   // "08:00"
+  endTime    String   // "08:40"
+  room       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([classId])
+  @@index([teacherId])
+  @@index([studentId])
+  @@index([dayOfWeek, period])
+}
