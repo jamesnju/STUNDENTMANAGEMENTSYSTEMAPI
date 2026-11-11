@@ -27,70 +27,71 @@ async function main() {
   for (const s of defaults) {
     await prisma.appSetting.upsert({ where: { param: s.param }, create: s, update: {} });
   }
-  // after the settings upsert loop
 
-const deptDefaults = [
-  { name: 'Science', code: 'SCI' },
-  { name: 'Arts', code: 'ART' },
-  { name: 'Administration', code: 'ADM' },
-];
-
-for (const d of deptDefaults) {
-  await prisma.department.upsert({
-    where: { code: d.code },
-    create: d,
-    update: {},
-  });
-}
-console.log('Departments seeded:', deptDefaults.map((d) => d.code).join(', '));
-}
-const extraSettings = [
-  { param: 'academic.school_name', valString: 'Green Valley Academy', description: 'School display name' },
-  { param: 'academic.timezone', valString: 'Africa/Nairobi', description: 'School timezone' },
-  { param: 'attendance.marking_window_hours', valInt: 24, description: 'How long after a class ends attendance can be edited' },
-  { param: 'grading.max_score', valInt: 100, description: 'Maximum score per assessment' },
-];
-for (const s of extraSettings) {
-  await prisma.appSetting.upsert({ where: { param: s.param }, create: s, update: {} });
-}
-// Add a demo class, subject, and enrollment so /me endpoints return data.
-const sci = await prisma.department.findUnique({ where: { code: 'SCI' } });
-if (sci) {
-  const demoTeacher = await prisma.teacher.findFirst({
-    where: { departmentId: sci.id, deletedAt: null },
-  });
-  if (demoTeacher) {
-    const math = await prisma.subject.upsert({
-      where: { code: 'MATH' },
-      create: { name: 'Mathematics', code: 'MATH', departmentId: sci.id },
+  const deptDefaults = [
+    { name: 'Science', code: 'SCI' },
+    { name: 'Arts', code: 'ART' },
+    { name: 'Administration', code: 'ADM' },
+  ];
+  for (const d of deptDefaults) {
+    await prisma.department.upsert({
+      where: { code: d.code },
+      create: d,
       update: {},
     });
+  }
+  console.log('Departments seeded:', deptDefaults.map((d) => d.code).join(', '));
 
-    const form1 = await prisma.class.upsert({
-      where: { code_academicYear: { code: 'F1A', academicYear: '2026' } },
-      create: {
-        name: 'Form 1A',
-        code: 'F1A',
-        academicYear: '2026',
-        departmentId: sci.id,
-        classTeacherId: demoTeacher.id,
-      },
-      update: {},
+  const extraSettings = [
+    { param: 'academic.school_name', valString: 'Green Valley Academy', description: 'School display name' },
+    { param: 'academic.timezone', valString: 'Africa/Nairobi', description: 'School timezone' },
+    { param: 'attendance.marking_window_hours', valInt: 24, description: 'How long after a class ends attendance can be edited' },
+    { param: 'grading.max_score', valInt: 100, description: 'Maximum score per assessment' },
+  ];
+  for (const s of extraSettings) {
+    await prisma.appSetting.upsert({ where: { param: s.param }, create: s, update: {} });
+  }
+
+  // Add a demo class, subject, and enrollment so /me endpoints return data.
+  const sci = await prisma.department.findUnique({ where: { code: 'SCI' } });
+  if (sci) {
+    const demoTeacher = await prisma.teacher.findFirst({
+      where: { departmentId: sci.id, deletedAt: null },
     });
+    if (demoTeacher) {
+      const math = await prisma.subject.upsert({
+        where: { code: 'MATH' },
+        create: { name: 'Mathematics', code: 'MATH', departmentId: sci.id },
+        update: {},
+      });
 
-    await prisma.classSubject.upsert({
-      where: {
-        classId_subjectId_teacherId: {
-          classId: form1.id,
-          subjectId: math.id,
-          teacherId: demoTeacher.id,
+      const form1 = await prisma.class.upsert({
+        where: { code_academicYear: { code: 'F1A', academicYear: '2026' } },
+        create: {
+          name: 'Form 1A',
+          code: 'F1A',
+          academicYear: '2026',
+          departmentId: sci.id,
+          classTeacherId: demoTeacher.id,
         },
-      },
-      create: { classId: form1.id, subjectId: math.id, teacherId: demoTeacher.id },
-      update: {},
-    });
+        update: {},
+      });
 
-    console.log('Demo class F1A, subject MATH, class-subject link created');
+      await prisma.classSubject.upsert({
+        where: {
+          classId_subjectId_teacherId: {
+            classId: form1.id,
+            subjectId: math.id,
+            teacherId: demoTeacher.id,
+          },
+        },
+        create: { classId: form1.id, subjectId: math.id, teacherId: demoTeacher.id },
+        update: {},
+      });
+
+      console.log('Demo class F1A, subject MATH, class-subject link created');
+    }
   }
 }
+
 main().finally(() => prisma.$disconnect());

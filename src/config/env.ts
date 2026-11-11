@@ -9,6 +9,19 @@ const schema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().default(7),
+  CLOUDINARY_CLOUD_NAME: z.string(),
+  CLOUDINARY_API_KEY: z.string(),
+  CLOUDINARY_API_SECRET: z.string(),
+
+  MAIL_PROVIDER: z.enum(['smtp', 'resend']).default('smtp'),
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  RESEND_API_KEY: z.string().optional(),
+  MAIL_FROM: z.string().email(),
+
+  ONLINE_CLASS_PROVIDER: z.enum(['jitsi', 'zoom', 'meet']).default('jitsi'),
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
 });
 

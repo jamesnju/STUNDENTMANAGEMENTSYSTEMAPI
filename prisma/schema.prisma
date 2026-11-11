@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ═══════════════════════════════════════════════════════════
+// ENUMS
+// ═══════════════════════════════════════════════════════════
+
 enum Role {
   ADMIN
   TEACHER
@@ -14,34 +18,102 @@ enum Role {
   PARENT
 }
 
+enum FileCategory {
+  NOTE
+  ASSIGNMENT_ATTACHMENT
+  SUBMISSION_ATTACHMENT
+  EXAM_PAPER
+  PROFILE_IMAGE
+  OTHER
+}
+
+enum AssignmentStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum AssessmentType {
+  QUIZ
+  TEST
+  EXAM
+}
+
+enum AssessmentStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  CLOSED
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+
+enum OnlineClassStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum Audience {
+  STUDENTS
+  PARENTS
+  TEACHERS
+  STAFF
+  CLASS
+}
+
+// ═══════════════════════════════════════════════════════════
+// CORE: USERS, AUTH, DEPARTMENT
+// ═══════════════════════════════════════════════════════════
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String
-  role          Role
-  isActive      Boolean   @default(true)
-  tokenVersion  Int       @default(0)
-  deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean   @default(true)
+  tokenVersion Int       @default(0)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   teacherProfile Teacher?
   studentProfile Student?
   parentProfile  Parent?
   refreshTokens  RefreshToken[]
 
+  uploadedFiles      File[]                  @relation("UploadedFiles")
+  notificationsSent  Notification[]
+  notificationsInbox NotificationRecipient[] @relation("NotificationRecipient")
+
   @@index([role])
   @@index([deletedAt])
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
   expiresAt DateTime
   revokedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
 }
@@ -52,10 +124,11 @@ model Department {
   code      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  classes         Class[]
-  subjects        Subject[]
-  teachers  Teacher[]
-  students  Student[]
+
+  classes  Class[]
+  subjects Subject[]
+  teachers Teacher[]
+  students Student[]
 }
 
 model Teacher {
@@ -72,9 +145,16 @@ model Teacher {
   deletedAt    DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-  classesTaught   Class[]          @relation("ClassTeacher")
-  subjectsTaught  ClassSubject[]   @relation("SubjectTeacher")
-  timetables      TimetableSlot[]  @relation("TeacherTimetable")
+
+  classesTaught     Class[]         @relation("ClassTeacher")
+  subjectsTaught    ClassSubject[]  @relation("SubjectTeacher")
+  timetables        TimetableSlot[] @relation("TeacherTimetable")
+  notes             Note[]
+  assignments       Assignment[]
+  gradedSubmissions Submission[]
+  assessments       Assessment[]
+  onlineClasses     OnlineClass[]
+
   @@index([departmentId])
   @@index([deletedAt])
 }
@@ -95,8 +175,12 @@ model Student {
   deletedAt    DateTime?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-  enrollments     ClassEnrollment[]
-  timetables      TimetableSlot[]  @relation("StudentTimetable")
+
+  enrollments ClassEnrollment[]
+  timetables  TimetableSlot[]     @relation("StudentTimetable")
+  submissions Submission[]
+  attempts    AssessmentAttempt[]
+
   @@index([departmentId])
   @@index([parentId])
   @@index([deletedAt])
@@ -125,26 +209,48 @@ model AppSetting {
   updatedAt   DateTime @updatedAt
 }
 
+// ═══════════════════════════════════════════════════════════
+// ACADEMIC: TERMS, CLASSES, SUBJECTS, ENROLLMENTS, TIMETABLE
+// ═══════════════════════════════════════════════════════════
 
+model Term {
+  id           String   @id @default(cuid())
+  name         String // "2025-Term1"
+  academicYear String // "2025"
+  startsAt     DateTime
+  endsAt       DateTime
+  isActive     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
+  assignments Assignment[]
+  assessments Assessment[]
+
+  @@unique([academicYear, name])
+  @@index([isActive])
+}
 
 model Class {
-  id             String    @id @default(cuid())
-  name           String                            // "Form 1A", "Grade 10B"
-  code           String    @unique                 // "F1A", "G10B"
-  academicYear   String                            // "2025", "2026"
+  id             String     @id @default(cuid())
+  name           String // "Form 1A", "Grade 10B"
+  code           String     @unique // "F1A", "G10B"
+  academicYear   String // "2025", "2026"
   departmentId   String
   department     Department @relation(fields: [departmentId], references: [id])
   classTeacherId String?
-  classTeacher   Teacher?  @relation("ClassTeacher", fields: [classTeacherId], references: [id])
-  isActive       Boolean   @default(true)
+  classTeacher   Teacher?   @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  isActive       Boolean    @default(true)
   deletedAt      DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
 
-  enrollments    ClassEnrollment[]
-  subjects       ClassSubject[]
-  timetables     TimetableSlot[]
+  enrollments   ClassEnrollment[]
+  subjects      ClassSubject[]
+  timetables    TimetableSlot[]
+  notes         Note[]
+  assignments   Assignment[]
+  assessments   Assessment[]
+  onlineClasses OnlineClass[]
 
   @@unique([code, academicYear])
   @@index([departmentId])
@@ -153,18 +259,22 @@ model Class {
 }
 
 model Subject {
-  id           String    @id @default(cuid())
-  name         String                            // "Mathematics"
-  code         String    @unique                 // "MATH"
+  id           String     @id @default(cuid())
+  name         String // "Mathematics"
+  code         String     @unique // "MATH"
   departmentId String
   department   Department @relation(fields: [departmentId], references: [id])
-  isActive     Boolean   @default(true)
+  isActive     Boolean    @default(true)
   deletedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  classes      ClassSubject[]
-  timetables   TimetableSlot[]
+  classes       ClassSubject[]
+  timetables    TimetableSlot[]
+  notes         Note[]
+  assignments   Assignment[]
+  assessments   Assessment[]
+  onlineClasses OnlineClass[]
 
   @@index([departmentId])
   @@index([deletedAt])
@@ -172,14 +282,14 @@ model Subject {
 
 /// Many-to-many: a subject is offered by one or more classes, taught by a teacher.
 model ClassSubject {
-  id         String    @id @default(cuid())
-  classId    String
-  class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subjectId  String
-  subject    Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  teacherId  String
-  teacher    Teacher   @relation("SubjectTeacher", fields: [teacherId], references: [id])
-  createdAt  DateTime  @default(now())
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacherId String
+  teacher   Teacher  @relation("SubjectTeacher", fields: [teacherId], references: [id])
+  createdAt DateTime @default(now())
 
   @@unique([classId, subjectId, teacherId])
   @@index([classId])
@@ -189,14 +299,14 @@ model ClassSubject {
 
 /// Student is enrolled in a class for a term.
 model ClassEnrollment {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
   classId    String
-  class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   studentId  String
-  student    Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  term       String                               // "2025-Term1"
-  enrolledAt DateTime  @default(now())
-  isActive   Boolean   @default(true)
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  term       String // "2025-Term1"
+  enrolledAt DateTime @default(now())
+  isActive   Boolean  @default(true)
 
   @@unique([classId, studentId, term])
   @@index([classId])
@@ -205,25 +315,317 @@ model ClassEnrollment {
 
 /// One slot in the weekly timetable: (class, subject, teacher, day, period).
 model TimetableSlot {
-  id         String   @id @default(cuid())
-  classId    String
-  class      Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subjectId  String
-  subject    Subject  @relation(fields: [subjectId], references: [id])
-  teacherId  String
-  teacher    Teacher  @relation("TeacherTimetable", fields: [teacherId], references: [id])
-  studentId  String?  // optional: student-specific slots (electives)
-  student    Student? @relation("StudentTimetable", fields: [studentId], references: [id])
-  dayOfWeek  Int      // 1=Mon … 5=Fri
-  period     Int      // 1..8
-  startTime  String   // "08:00"
-  endTime    String   // "08:40"
-  room       String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  teacherId String
+  teacher   Teacher  @relation("TeacherTimetable", fields: [teacherId], references: [id])
+  studentId String? // optional: student-specific slots (electives)
+  student   Student? @relation("StudentTimetable", fields: [studentId], references: [id])
+  dayOfWeek Int // 1=Mon … 5=Fri
+  period    Int // 1..8
+  startTime String // "08:00"
+  endTime   String // "08:40"
+  room      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([classId])
   @@index([teacherId])
   @@index([studentId])
   @@index([dayOfWeek, period])
+}
+
+// ═══════════════════════════════════════════════════════════
+// FILES (Cloudinary-backed)
+// ═══════════════════════════════════════════════════════════
+
+model File {
+  id           String       @id @default(cuid())
+  publicId     String       @unique // cloudinary public_id
+  url          String
+  resourceType String // "image" | "raw" | "video"
+  format       String?
+  bytes        Int
+  originalName String
+  mimeType     String
+  category     FileCategory @default(OTHER)
+
+  uploadedById String
+  uploadedBy   User   @relation("UploadedFiles", fields: [uploadedById], references: [id])
+
+  noteId String?
+  note   Note?   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  assignmentId String?
+  assignment   Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  submissionId String?
+  submission   Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+
+  assessmentId String?
+  assessment   Assessment? @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([uploadedById])
+  @@index([category])
+  @@index([noteId])
+  @@index([assignmentId])
+  @@index([submissionId])
+  @@index([assessmentId])
+}
+
+// ═══════════════════════════════════════════════════════════
+// NOTES
+// ═══════════════════════════════════════════════════════════
+
+model Note {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  teacherId   String
+  teacher     Teacher   @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  classId     String?
+  class       Class?    @relation(fields: [classId], references: [id], onDelete: SetNull)
+  subjectId   String?
+  subject     Subject?  @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  files       File[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([teacherId])
+  @@index([classId])
+  @@index([subjectId])
+  @@index([deletedAt])
+}
+
+// ═══════════════════════════════════════════════════════════
+// ASSIGNMENTS & SUBMISSIONS
+// ═══════════════════════════════════════════════════════════
+
+model Assignment {
+  id           String           @id @default(cuid())
+  title        String
+  instructions String?
+  classId      String
+  class        Class            @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subjectId    String
+  subject      Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacherId    String
+  teacher      Teacher          @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  termId       String
+  term         Term             @relation(fields: [termId], references: [id], onDelete: Restrict)
+  status       AssignmentStatus @default(DRAFT)
+  dueAt        DateTime?
+  publishedAt  DateTime?
+  files        File[]
+  submissions  Submission[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  deletedAt    DateTime?
+
+  @@index([classId, subjectId])
+  @@index([teacherId])
+  @@index([dueAt])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Submission {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  content      String?
+  submittedAt  DateTime   @default(now())
+  grade        Float?
+  feedback     String?
+  gradedAt     DateTime?
+  gradedById   String?
+  gradedBy     Teacher?   @relation(fields: [gradedById], references: [id], onDelete: SetNull)
+  files        File[]
+
+  @@unique([assignmentId, studentId])
+  @@index([studentId])
+  @@index([gradedById])
+}
+
+// ═══════════════════════════════════════════════════════════
+// ASSESSMENTS (quizzes / tests / exams)
+// ═══════════════════════════════════════════════════════════
+
+model Assessment {
+  id           String               @id @default(cuid())
+  title        String
+  type         AssessmentType
+  status       AssessmentStatus     @default(DRAFT)
+  classId      String
+  class        Class                @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subjectId    String
+  subject      Subject              @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacherId    String
+  teacher      Teacher              @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  termId       String
+  term         Term                 @relation(fields: [termId], references: [id], onDelete: Restrict)
+  opensAt      DateTime? // scheduling
+  closesAt     DateTime?
+  durationMins Int?
+  totalMarks   Int                  @default(0)
+  isOnline     Boolean              @default(true)
+  files        File[] // exam paper for offline exams
+  questions    AssessmentQuestion[] // for online exams
+  attempts     AssessmentAttempt[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  deletedAt    DateTime?
+
+  @@index([classId, subjectId])
+  @@index([teacherId])
+  @@index([status, opensAt])
+  @@index([deletedAt])
+}
+
+model AssessmentQuestion {
+  id           String     @id @default(cuid())
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  order        Int
+  type         String // "MCQ" | "SHORT" | "LONG"
+  prompt       String
+  options      Json? // for MCQ
+  correct      Json? // for auto-grading
+  marks        Int        @default(1)
+
+  @@unique([assessmentId, order])
+  @@index([assessmentId])
+}
+
+model AssessmentAttempt {
+  id           String        @id @default(cuid())
+  assessmentId String
+  assessment   Assessment    @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  status       AttemptStatus @default(IN_PROGRESS)
+  startedAt    DateTime      @default(now())
+  submittedAt  DateTime?
+  score        Float?
+  answers      Json? // [{ questionId, answer }]
+
+  @@unique([assessmentId, studentId])
+  @@index([studentId])
+  @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════
+// ONLINE CLASSES
+// ═══════════════════════════════════════════════════════════
+
+model OnlineClass {
+  id           String            @id @default(cuid())
+  title        String
+  classId      String
+  class        Class             @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subjectId    String
+  subject      Subject           @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  teacherId    String
+  teacher      Teacher           @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  startsAt     DateTime
+  endsAt       DateTime
+  meetingUrl   String
+  meetingId    String?
+  status       OnlineClassStatus @default(SCHEDULED)
+  recordingUrl String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([classId])
+  @@index([teacherId])
+  @@index([startsAt, status])
+}
+
+// ═══════════════════════════════════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════
+
+model Notification {
+  id           String                  @id @default(cuid())
+  title        String
+  body         String
+  audience     Audience
+  classId      String? // when audience=CLASS
+  scheduledFor DateTime? // null = send now (job picks up immediately)
+  status       NotificationStatus      @default(PENDING)
+  createdById  String
+  createdBy    User                    @relation(fields: [createdById], references: [id])
+  recipients   NotificationRecipient[]
+  createdAt    DateTime                @default(now())
+  sentAt       DateTime?
+
+  @@index([status, scheduledFor])
+  @@index([createdById])
+}
+
+model NotificationRecipient {
+  id             String              @id @default(cuid())
+  notificationId String
+  notification   Notification        @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User                @relation("NotificationRecipient", fields: [userId], references: [id])
+  channel        NotificationChannel
+  status         NotificationStatus  @default(PENDING)
+  sentAt         DateTime?
+  readAt         DateTime?
+  error          String?
+
+  @@unique([notificationId, userId, channel])
+  @@index([userId, status])
+  @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════
+// EMAIL LOG (audit + debugging)
+// ═══════════════════════════════════════════════════════════
+
+model EmailLog {
+  id             String   @id @default(cuid())
+  to             String
+  subject        String
+  provider       String
+  providerMsgId  String?
+  status         String // "SENT" | "FAILED"
+  error          String?
+  notificationId String?
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([notificationId])
+}
+
+// ═══════════════════════════════════════════════════════════
+// JOB RUNS (manual job-trigger audit trail)
+// ═══════════════════════════════════════════════════════════
+
+model JobRun {
+  id          String   @id @default(cuid())
+  jobName     String
+  triggeredBy String? // User.id of the admin who triggered it
+  status      String // "SUCCESS" | "FAILED"
+  durationMs  Int
+  input       Json?
+  result      Json?
+  error       String?
+  createdAt   DateTime @default(now())
+
+  @@index([jobName, createdAt])
+  @@index([status])
+  @@index([triggeredBy])
 }
