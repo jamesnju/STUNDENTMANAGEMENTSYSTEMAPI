@@ -1,5 +1,5 @@
 {
-  "email": "admin2@school.local",
+  "email": "admin@school.local",
   "password": "Admin@12345",
   "role": "ADMIN"
 }
