@@ -3,7 +3,12 @@ import { prisma } from '../../config/database';
 
 export const timetableRepository = {
   findById: (id: string) =>
-    prisma.timetableSlot.findUnique({ where: { id } }),
+    prisma.timetableSlot.findUnique({
+      where: { id },
+      include: {
+        roomRel: { select: { id: true, name: true, code: true, building: true } },
+      },
+    }),
 
   list: (args: {
     skip: number;
@@ -12,6 +17,7 @@ export const timetableRepository = {
     teacherId?: string;
     subjectId?: string;
     studentId?: string;
+    roomId?: string;
     dayOfWeek?: number;
   }) => {
     const where: Prisma.TimetableSlotWhereInput = {};
@@ -19,6 +25,7 @@ export const timetableRepository = {
     if (args.teacherId) where.teacherId = args.teacherId;
     if (args.subjectId) where.subjectId = args.subjectId;
     if (args.studentId) where.studentId = args.studentId;
+    if (args.roomId) where.roomId = args.roomId;
     if (args.dayOfWeek) where.dayOfWeek = args.dayOfWeek;
 
     return Promise.all([
@@ -31,18 +38,19 @@ export const timetableRepository = {
           class: { select: { id: true, name: true, code: true } },
           subject: { select: { id: true, name: true, code: true } },
           teacher: { select: { id: true, firstName: true, lastName: true } },
+          roomRel: { select: { id: true, name: true, code: true, building: true } },
         },
       }),
       prisma.timetableSlot.count({ where }),
     ]);
   },
 
-  /** Detect whether (teacher|class) already occupies the given (day, period). */
   findConflicts: async (args: {
     dayOfWeek: number;
     period: number;
     classId: string;
     teacherId: string;
+    roomId?: string;
     excludeId?: string;
   }) => {
     const base: Prisma.TimetableSlotWhereInput = {
@@ -51,7 +59,7 @@ export const timetableRepository = {
       ...(args.excludeId ? { id: { not: args.excludeId } } : {}),
     };
 
-    const [classConflict, teacherConflict] = await Promise.all([
+    const [classConflict, teacherConflict, roomConflict] = await Promise.all([
       prisma.timetableSlot.findFirst({
         where: { ...base, classId: args.classId },
         select: { id: true },
@@ -60,9 +68,15 @@ export const timetableRepository = {
         where: { ...base, teacherId: args.teacherId },
         select: { id: true },
       }),
+      args.roomId
+        ? prisma.timetableSlot.findFirst({
+            where: { ...base, roomId: args.roomId },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
     ]);
 
-    return { classConflict, teacherConflict };
+    return { classConflict, teacherConflict, roomConflict };
   },
 
   create: (data: Prisma.TimetableSlotCreateInput) =>

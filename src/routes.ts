@@ -15,6 +15,8 @@ import subjectsRoutes from './modules/academic/subjects/subject.routes';
 import classesRoutes from './modules/academic/classes/class.routes';
 import classSubjectsRoutes from './modules/academic/class-subjects/classSubject.routes';
 import enrollmentsRoutes from './modules/academic/enrollments/enrollment.routes';
+import roomsRoutes from './modules/rooms/room.routes';
+
 
 const router = Router();
 
@@ -35,5 +37,7 @@ router.use('/admin/academic/classes', classesRoutes);
 router.use('/admin/academic/class-subjects', classSubjectsRoutes);
 router.use('/admin/academic/enrollments', enrollmentsRoutes);
 router.use('/timetable', timetableRoutes);
+router.use('/admin/rooms', roomsRoutes);
+
 
 export default router;

@@ -331,7 +331,10 @@ model TimetableSlot {
   room      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  roomId    String?
+  roomRel   Room?    @relation(fields: [roomId], references: [id], onDelete: SetNull)
 
+  @@index([roomId])
   @@index([classId])
   @@index([teacherId])
   @@index([studentId])
@@ -588,6 +591,21 @@ model NotificationRecipient {
   @@unique([notificationId, userId, channel])
   @@index([userId, status])
   @@index([status])
+}
+
+model Room {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String?  @unique
+  capacity    Int?
+  building    String?
+  floor       Int?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  timetables TimetableSlot[]
 }
 
 // ═══════════════════════════════════════════════════════════

@@ -14,6 +14,7 @@ export const createSlotSchema = z
     startTime: z.string().regex(timeRegex, 'HH:MM'),
     endTime: z.string().regex(timeRegex, 'HH:MM'),
     room: z.string().max(20).optional(),
+    roomId: z.string().cuid().nullable().optional(),
   })
   .refine((d) => d.startTime < d.endTime, {
     message: 'endTime must be after startTime',
@@ -29,6 +30,7 @@ export const updateSlotSchema = z
     period: z.number().int().min(1).max(8).optional(),
     startTime: z.string().regex(timeRegex).optional(),
     endTime: z.string().regex(timeRegex).optional(),
+    roomId: z.string().cuid().nullable().optional(),
     room: z.string().max(20).optional(),
   })
   .refine((d) => Object.keys(d).length > 0, {
@@ -40,6 +42,7 @@ export const listSlotsSchema = paginationSchema.extend({
   teacherId: z.string().cuid().optional(),
   subjectId: z.string().cuid().optional(),
   studentId: z.string().cuid().optional(),
+  roomId: z.string().cuid().optional(),
   dayOfWeek: z.coerce.number().int().min(1).max(5).optional(),
 });
 
