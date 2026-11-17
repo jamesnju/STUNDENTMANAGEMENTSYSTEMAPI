@@ -16,6 +16,12 @@ import classesRoutes from './modules/academic/classes/class.routes';
 import classSubjectsRoutes from './modules/academic/class-subjects/classSubject.routes';
 import enrollmentsRoutes from './modules/academic/enrollments/enrollment.routes';
 import roomsRoutes from './modules/rooms/room.routes';
+import notesRoutes from './modules/notes/note.routes';
+import assignmentsRoutes from './modules/assignments/assignment.routes';
+import submissionsRoutes from './modules/assignments/submissions/submission.routes';
+import parentRoutes from './modules/parents/parent.routes';
+
+
 
 
 const router = Router();
@@ -38,6 +44,11 @@ router.use('/admin/academic/class-subjects', classSubjectsRoutes);
 router.use('/admin/academic/enrollments', enrollmentsRoutes);
 router.use('/timetable', timetableRoutes);
 router.use('/admin/rooms', roomsRoutes);
+router.use('/notes', notesRoutes);
+router.use('/assignments', assignmentsRoutes);
+router.use('/', submissionsRoutes);
+router.use('/parents', parentRoutes);
+
 
 
 export default router;

@@ -22,5 +22,6 @@ router.get(
   validate({ params: studentIdParamSchema }),
   asyncHandler(teacherController.myStudentById),
 );
+router.get('/me/timetable', asyncHandler(teacherController.myTimetable));
 
 export default router;

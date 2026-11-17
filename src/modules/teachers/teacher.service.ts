@@ -1,3 +1,4 @@
+import { prisma } from '../../config/database';
 import { NotFound } from '../../shared/errors/httpErrors';
 import { teacherRepository } from './teacher.repository';
 
@@ -42,4 +43,19 @@ export const teacherService = {
     if (!student) throw NotFound('Student not found in your scope');
     return student;
   },
+  async myTimetable(userId: string) {
+  const teacher = await teacherRepository.findByUserId(userId);
+  if (!teacher) throw NotFound('Teacher profile not found');
+
+  // All slots where this teacher is the assigned teacher.
+  return prisma.timetableSlot.findMany({
+    where: { teacherId: teacher.id },
+    include: {
+      class: { select: { id: true, name: true, code: true } },
+      subject: { select: { id: true, name: true, code: true } },
+      roomRel: { select: { id: true, name: true, code: true, building: true } },
+    },
+    orderBy: [{ dayOfWeek: 'asc' }, { period: 'asc' }],
+  });
+}
 };

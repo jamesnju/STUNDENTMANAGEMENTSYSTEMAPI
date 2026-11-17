@@ -30,4 +30,20 @@ export const studentService = {
     });
     return { items };
   },
+  async myNotes(userId: string, query: { skip: number; take: number }) {
+  const student = await studentRepository.findByUserId(userId);
+  if (!student) throw NotFound('Student profile not found');
+  const [items, total] = await studentRepository.myNotes(student.id, query);
+  return { items, total };
+},
+
+async myAssignments(
+  userId: string,
+  query: { skip: number; take: number; status?: 'PUBLISHED' | 'CLOSED' },
+) {
+  const student = await studentRepository.findByUserId(userId);
+  if (!student) throw NotFound('Student profile not found');
+  const [items, total] = await studentRepository.myAssignments(student.id, query);
+  return { items, total };
+},
 };

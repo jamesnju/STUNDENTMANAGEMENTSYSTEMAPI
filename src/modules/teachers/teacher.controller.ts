@@ -38,4 +38,8 @@ export const teacherController = {
     const student = await teacherService.myStudentById(user.id, studentId);
     res.json({ success: true, data: student });
   },
+  async myTimetable(req: Request, res: Response) {
+  const user = requireUser(req);
+  res.json({ success: true, data: await teacherService.myTimetable(user.id) });
+},
 };
